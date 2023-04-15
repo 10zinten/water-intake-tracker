@@ -1,51 +1,53 @@
-import datetime
-import sqlite3
+from datetime import datetime
 import subprocess
 from pathlib import Path
 
+from tinydb import TinyDB
 
-def alert_to_drink_water():
-    ALERT_CMD = """
-    display alert "Time to Drink Water"
-    """
+# CONSTANTS
+WATER_PER_INTAKE = 0.05 # in liters
 
-    result = subprocess.run(["osascript", "-e", ALERT_CMD], capture_output=True)
-    stdout = result.stdout.decode()
-    return "OK" in stdout
-
-def record_in_db():
-    DATABASE_PATH = Path(__file__).parent / "personal.db"
-    sql_create_water_intake_record_table = """
-        CREATE TABLE IF NOT EXISTS water_intake_record (
-            id integer PRIMARY KEY,
-            datetime TIMESTAMP
-        );
-    """
-    sql_inter_query = """
-        INSERT INTO water_intake_record (datetime)
-        VALUES (?);
-    """
+db_path = Path(__file__).resolve().parent / "water-intake-records.json"
+db = TinyDB(db_path)
 
 
-    conn = sqlite3.connect(
-        str(DATABASE_PATH),
-        detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES
+def ask_to_drink_water():
+
+    applescript = '''
+    tell application "System Events"
+        display dialog "Please drink a glass of water." with title "💧 Drink Water Reminder" buttons {"OK"} default button 1 giving up after 5
+
+        set userResponse to button returned of (display dialog "Did you drink water?" with title "💧 Confirmation" buttons {"No", "Yes"} default button 1)
+
+        if userResponse is "Yes" then
+            display dialog "Great! Stay hydrated! 😀" with title "💧 Success" buttons {"OK"} default button 1 giving up after 5
+        else
+            display dialog "remember to drink water regularly. 💧💧💧" with title "💧 Reminder" buttons {"OK"} default button 1 giving up after 5
+        end if
+
+        return userResponse
+    end tell
+    '''
+
+    result = subprocess.run(
+        ["osascript", "-e", applescript],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
     )
 
-    conn.execute(sql_create_water_intake_record_table)
+    user_response = result.stdout.strip()
+    return True if user_response == "Yes" else False
 
-    conn.execute(sql_inter_query, (datetime.datetime.now(),))
-
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM water_intake_record")
-    for row in cursor.fetchall():
-        print(row[1].day)
+def record_in_db():
+    record = {"datetime": str(datetime.now()), "intake": WATER_PER_INTAKE} 
+    db.insert(record)
 
 
 def main():
-    have_drunk = alert_to_drink_water()
+    have_drunk = ask_to_drink_water()
     if have_drunk:
-        record_in_db()
+       record_in_db()
 
 
 if __name__ == "__main__":
