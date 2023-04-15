@@ -7,8 +7,13 @@ from tinydb import TinyDB
 # CONSTANTS
 WATER_PER_INTAKE = 0.05 # in liters
 
-db_path = Path(__file__).resolve().parent / "water-intake-records.json"
+ROOT_DIR = Path(__file__).parent.resolve()
+db_path = ROOT_DIR / "water-intake-records.json"
 db = TinyDB(db_path)
+
+def commit_and_push(path):
+    subprocess.run(["git", "commit", "-am", "update record"], cwd=path)
+    subprocess.run(["git", "push", "origin", "main"], cwd=path)
 
 
 def ask_to_drink_water():
@@ -42,6 +47,7 @@ def ask_to_drink_water():
 def record_in_db():
     record = {"datetime": str(datetime.now()), "intake": WATER_PER_INTAKE} 
     db.insert(record)
+    commit_and_push(ROOT_DIR)
 
 
 def main():
